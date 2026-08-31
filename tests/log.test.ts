@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
-import { redactUrl, logger, safeMessage } from '../src/log.js'
+import { redactUrl, logger, safeMessage, setLogSink, type LogLine } from '../src/log.js'
 
 describe('redactUrl', () => {
   it('strips the query string from a signed asset URL', () => {
@@ -67,69 +67,109 @@ describe('safeMessage', () => {
   })
 })
 
-describe('logger', () => {
+describe('log sink', () => {
   afterEach(() => {
-    vi.restoreAllMocks()
+    setLogSink(() => {})
   })
 
-  it('logger.info writes valid JSON to stderr with correct level and msg', () => {
-    const spy = vi.spyOn(process.stderr, 'write')
+  it('delivers level, message and fields to the installed sink', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
+    logger.info('hello', { count: 3 })
+    expect(lines).toEqual([{ level: 'info', msg: 'hello', fields: { count: 3 } }])
+  })
+
+  it('defaults fields to an empty object', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
+    logger.warn('bare')
+    expect(lines[0]?.fields).toEqual({})
+  })
+
+  it('routes each level correctly', () => {
+    const levels: string[] = []
+    setLogSink((line) => levels.push(line.level))
+    logger.info('a')
+    logger.warn('b')
+    logger.error('c')
+    expect(levels).toEqual(['info', 'warn', 'error'])
+  })
+
+  it('swallows a throwing sink so logging can never break a run', () => {
+    setLogSink(() => {
+      throw new Error('sink exploded')
+    })
+    expect(() => logger.info('still fine')).not.toThrow()
+  })
+
+  it('discards output when no sink is installed', () => {
+    setLogSink(() => {})
+    expect(() => logger.error('nobody listening')).not.toThrow()
+  })
+})
+
+describe('logger', () => {
+  afterEach(() => {
+    setLogSink(() => {})
+  })
+
+  it('logger.info delivers correct level and msg to sink', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
     logger.info('test message')
 
-    expect(spy).toHaveBeenCalledOnce()
-    const output = spy.mock.calls[0]?.[0]
-    expect(typeof output).toBe('string')
-    const parsed = JSON.parse(output as string)
-    expect(parsed).toEqual({
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toEqual({
       level: 'info',
       msg: 'test message',
+      fields: {},
     })
   })
 
-  it('logger.warn writes valid JSON to stderr with correct level and msg', () => {
-    const spy = vi.spyOn(process.stderr, 'write')
+  it('logger.warn delivers correct level and msg to sink', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
     logger.warn('warning message')
 
-    expect(spy).toHaveBeenCalledOnce()
-    const output = spy.mock.calls[0]?.[0]
-    const parsed = JSON.parse(output as string)
-    expect(parsed.level).toBe('warn')
-    expect(parsed.msg).toBe('warning message')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]?.level).toBe('warn')
+    expect(lines[0]?.msg).toBe('warning message')
   })
 
-  it('logger.error writes valid JSON to stderr with correct level and msg', () => {
-    const spy = vi.spyOn(process.stderr, 'write')
+  it('logger.error delivers correct level and msg to sink', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
     logger.error('error message')
 
-    expect(spy).toHaveBeenCalledOnce()
-    const output = spy.mock.calls[0]?.[0]
-    const parsed = JSON.parse(output as string)
-    expect(parsed.level).toBe('error')
-    expect(parsed.msg).toBe('error message')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]?.level).toBe('error')
+    expect(lines[0]?.msg).toBe('error message')
   })
 
   it('logger methods include optional fields in output', () => {
-    const spy = vi.spyOn(process.stderr, 'write')
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
     logger.info('test', { userId: 123, action: 'login' })
 
-    expect(spy).toHaveBeenCalledOnce()
-    const output = spy.mock.calls[0]?.[0]
-    const parsed = JSON.parse(output as string)
-    expect(parsed).toEqual({
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toEqual({
       level: 'info',
       msg: 'test',
-      userId: 123,
-      action: 'login',
+      fields: { userId: 123, action: 'login' },
     })
   })
 
-  it('logger writes to stderr not stdout', () => {
-    const stderrSpy = vi.spyOn(process.stderr, 'write')
-    const stdoutSpy = vi.spyOn(process.stdout, 'write')
+  it('logger delivers each line to the installed sink', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
 
-    logger.info('test')
+    logger.info('first')
+    logger.warn('second')
+    logger.error('third')
 
-    expect(stderrSpy).toHaveBeenCalledOnce()
-    expect(stdoutSpy).not.toHaveBeenCalled()
+    expect(lines).toHaveLength(3)
+    expect(lines[0]?.msg).toBe('first')
+    expect(lines[1]?.msg).toBe('second')
+    expect(lines[2]?.msg).toBe('third')
   })
 })

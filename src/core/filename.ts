@@ -21,5 +21,5 @@ export function relativePathFor(ref: DocumentRef): string {
   const directory = DIRECTORIES[ref.kind]
   const label = sanitizeLabel(ref.label)
   const extension = sanitizeLabel(ref.extension) || 'pdf'
-  return `${directory}/${ref.date}_${label}_${ref.id}.${extension}`
+  return `${directory}/${sanitizeLabel(ref.date)}_${label}_${sanitizeLabel(ref.id)}.${extension}`
 }

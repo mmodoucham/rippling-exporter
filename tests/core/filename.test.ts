@@ -49,4 +49,41 @@ describe('relativePathFor', () => {
   it('honours a non-pdf extension', () => {
     expect(relativePathFor({ ...base, extension: 'png' }).endsWith('.png')).toBe(true)
   })
+
+  // FINDING 1: Hardening - sanitize date and id to prevent path traversal
+  it('sanitizes id to prevent path traversal', () => {
+    const path = relativePathFor({ ...base, id: '../../etc/passwd' })
+    expect(path).not.toContain('..')
+    expect(path.split('/')).toHaveLength(2)
+  })
+
+  it('sanitizes date with separator to prevent extra path segments', () => {
+    const path = relativePathFor({ ...base, date: '2026/03/10' })
+    expect(path).not.toContain('2026/03/10')
+    expect(path.split('/')).toHaveLength(2)
+  })
+
+  it('well-formed ref produces exact expected path (regression test)', () => {
+    expect(relativePathFor(base)).toBe('invoices/2026-03-10_INV_03-10-2026_3_68c1a2b3d4e5f60718293a4b.pdf')
+  })
+
+  // FINDING 2: Extension fallback coverage
+  it('extension empty string falls back to pdf', () => {
+    expect(relativePathFor({ ...base, extension: '' }).endsWith('.pdf')).toBe(true)
+  })
+
+  it('extension sanitizing to empty falls back to pdf', () => {
+    expect(relativePathFor({ ...base, extension: '!!!' }).endsWith('.pdf')).toBe(true)
+  })
+
+  it('extension preserved when valid', () => {
+    expect(relativePathFor({ ...base, extension: 'png' }).endsWith('.png')).toBe(true)
+  })
+
+  // FINDING 3: Label sanitizing to empty
+  it('label sanitizing to empty produces well-formed path with doubled separator', () => {
+    const path = relativePathFor({ ...base, label: '!!!' })
+    expect(path).toBe('invoices/2026-03-10__68c1a2b3d4e5f60718293a4b.pdf')
+    expect(path.split('/')).toHaveLength(2)
+  })
 })

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { redactUrl } from '../src/log.js'
+import { describe, expect, it, afterEach, vi } from 'vitest'
+import { redactUrl, logger } from '../src/log.js'
 
 describe('redactUrl', () => {
   it('strips the query string from a signed asset URL', () => {
@@ -18,5 +18,72 @@ describe('redactUrl', () => {
 
   it('returns a placeholder for an unparseable value', () => {
     expect(redactUrl('not a url')).toBe('<unparseable-url>')
+  })
+})
+
+describe('logger', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('logger.info writes valid JSON to stderr with correct level and msg', () => {
+    const spy = vi.spyOn(process.stderr, 'write')
+    logger.info('test message')
+
+    expect(spy).toHaveBeenCalledOnce()
+    const output = spy.mock.calls[0]?.[0]
+    expect(typeof output).toBe('string')
+    const parsed = JSON.parse(output as string)
+    expect(parsed).toEqual({
+      level: 'info',
+      msg: 'test message',
+    })
+  })
+
+  it('logger.warn writes valid JSON to stderr with correct level and msg', () => {
+    const spy = vi.spyOn(process.stderr, 'write')
+    logger.warn('warning message')
+
+    expect(spy).toHaveBeenCalledOnce()
+    const output = spy.mock.calls[0]?.[0]
+    const parsed = JSON.parse(output as string)
+    expect(parsed.level).toBe('warn')
+    expect(parsed.msg).toBe('warning message')
+  })
+
+  it('logger.error writes valid JSON to stderr with correct level and msg', () => {
+    const spy = vi.spyOn(process.stderr, 'write')
+    logger.error('error message')
+
+    expect(spy).toHaveBeenCalledOnce()
+    const output = spy.mock.calls[0]?.[0]
+    const parsed = JSON.parse(output as string)
+    expect(parsed.level).toBe('error')
+    expect(parsed.msg).toBe('error message')
+  })
+
+  it('logger methods include optional fields in output', () => {
+    const spy = vi.spyOn(process.stderr, 'write')
+    logger.info('test', { userId: 123, action: 'login' })
+
+    expect(spy).toHaveBeenCalledOnce()
+    const output = spy.mock.calls[0]?.[0]
+    const parsed = JSON.parse(output as string)
+    expect(parsed).toEqual({
+      level: 'info',
+      msg: 'test',
+      userId: 123,
+      action: 'login',
+    })
+  })
+
+  it('logger writes to stderr not stdout', () => {
+    const stderrSpy = vi.spyOn(process.stderr, 'write')
+    const stdoutSpy = vi.spyOn(process.stdout, 'write')
+
+    logger.info('test')
+
+    expect(stderrSpy).toHaveBeenCalledOnce()
+    expect(stdoutSpy).not.toHaveBeenCalled()
   })
 })

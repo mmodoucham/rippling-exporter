@@ -21,8 +21,10 @@ const program = new Command()
 
 async function main(): Promise<number> {
   const config = parseConfig(program.parse().opts())
-  const { session, close } = await openSession()
+  let close: (() => Promise<void>) | undefined
   try {
+    const { session, close: closeSession } = await openSession()
+    close = closeSession
     const result = await runExport(
       config,
       {
@@ -34,7 +36,7 @@ async function main(): Promise<number> {
     process.stdout.write(`${formatReport(result, config.out)}\n`)
     return result.failed > 0 ? 1 : 0
   } finally {
-    await close()
+    if (close) await close()
   }
 }
 

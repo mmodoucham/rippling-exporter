@@ -13,7 +13,10 @@ export const REQUIRED_HEADERS = [
 export function sessionFromHeaders(
   captured: Readonly<Record<string, string>>,
 ): RipplingSession {
-  const missing = REQUIRED_HEADERS.filter((name) => captured[name] === undefined)
+  const missing = REQUIRED_HEADERS.filter((name) => {
+    const value = captured[name]
+    return value === undefined || value.trim().length === 0
+  })
   if (missing.length > 0) {
     throw new Error(`session capture incomplete, missing header(s): ${missing.join(', ')}`)
   }

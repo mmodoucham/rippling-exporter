@@ -34,4 +34,18 @@ describe('sessionFromHeaders', () => {
     const { role, ...rest } = captured
     expect(() => sessionFromHeaders(rest)).toThrow(/role/)
   })
+
+  it('throws a named error when the authorization header is an empty string', () => {
+    expect(() => sessionFromHeaders({ ...captured, authorization: '' })).toThrow(
+      /authorization/,
+    )
+  })
+
+  it('throws a named error when the role header is whitespace-only', () => {
+    expect(() => sessionFromHeaders({ ...captured, role: '   ' })).toThrow(/role/)
+  })
+
+  it('still succeeds when every required header has a non-empty value', () => {
+    expect(sessionFromHeaders(captured).roleId).toBe('role-id')
+  })
 })

@@ -149,6 +149,46 @@ describe('runExport', () => {
     expect(peak).toBe(1)
   })
 
+  it('de-duplicates refs that resolve to the same archive path, keeping the first', async () => {
+    const dupedPaystubs: readonly PaystubRecord[] = [
+      {
+        id: 'stub-1',
+        stubName: 'Mar 1 - Mar 15',
+        checkDate: '2026-03-13',
+        pdfFileForEE: 'https://x.test/stub-a.pdf',
+      },
+      {
+        id: 'stub-1',
+        stubName: 'Mar 1 - Mar 15',
+        checkDate: '2026-03-13',
+        pdfFileForEE: 'https://x.test/stub-b.pdf',
+      },
+    ]
+    const dupedLister = {
+      listInvoices: async () => [],
+      listPaystubs: async () => dupedPaystubs,
+    }
+    const paths: string[] = []
+    const download = vi.fn().mockResolvedValue(PDF)
+    const result = await runExport(
+      options({ types: ['paystubs'] }),
+      dupedLister,
+      download,
+      (path) => paths.push(path),
+    )
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(paths).toHaveLength(1)
+    expect(result.downloaded).toBe(1)
+    expect(result.failed).toBe(0)
+  })
+
+  it('leaves a normal run (no duplicate paths) unaffected', async () => {
+    const paths: string[] = []
+    const result = await runExport(options(), lister, async () => PDF, (path) => paths.push(path))
+    expect(result.downloaded).toBe(3)
+    expect(paths).toHaveLength(3)
+  })
+
   it('returns an empty result when nothing is in range', async () => {
     const result = await runExport(
       options({ range: { from: '2020-01-01', to: '2020-12-31' } }),

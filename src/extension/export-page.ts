@@ -136,6 +136,12 @@ async function run(session: RipplingSession): Promise<void> {
       (done, total) => setStatus(`Downloaded ${done} of ${total}…`),
     )
 
+    if (result.failed > 0 && entries.length === 0) {
+      setStatus(`All ${result.failed} document(s) failed to download.`)
+      renderFailures(result.failures)
+      return
+    }
+
     if (entries.length === 0) {
       setStatus('Nothing to download in that date range.')
       renderFailures(result.failures)

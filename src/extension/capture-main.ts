@@ -6,7 +6,14 @@ import { CAPTURE_MESSAGE } from './protocol.js'
 // it captures to the isolated-world bridge instead.
 const original = window.fetch
 
-function requestUrl(request: RequestInfo | URL): string | null {
+// The SPA issues dozens of /api/ calls per navigation, all carrying the same
+// bearer token. Posting on every one would broadcast the token to any
+// passive in-page listener (analytics, breadcrumb-collecting error
+// reporters) dozens of times over. Track the last authorization value
+// actually posted and skip re-posting an unchanged one.
+let lastSent: string | undefined
+
+export function requestUrl(request: RequestInfo | URL): string | null {
   if (typeof request === 'string') return request
   if (request instanceof URL) return request.href
   if (request instanceof Request) return request.url
@@ -38,7 +45,9 @@ window.fetch = async function patched(
         const value = collected[name]
         if (value !== undefined) narrowed[name] = value
       }
-      if (narrowed['authorization'] !== undefined) {
+      const authorization = narrowed['authorization']
+      if (authorization !== undefined && authorization !== lastSent) {
+        lastSent = authorization
         window.postMessage({ type: CAPTURE_MESSAGE, headers: narrowed }, window.origin)
       }
     }

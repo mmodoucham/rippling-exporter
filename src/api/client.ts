@@ -8,7 +8,9 @@ export interface RipplingSession {
 
 export class SessionExpiredError extends Error {
   constructor() {
-    super('Rippling session expired. Re-run the command to sign in again.')
+    super(
+      'Rippling session expired. Refresh a logged-in app.rippling.com tab, then reload the export page.',
+    )
     this.name = 'SessionExpiredError'
   }
 }

@@ -25,7 +25,12 @@ window.addEventListener('message', (event: MessageEvent): void => {
     // sessionFromHeaders validates that every required header is present and
     // non-empty, and throws otherwise.
     const session = sessionFromHeaders(payload.headers as Record<string, string>)
-    void storeSession(session)
+    storeSession(session).catch(() => {
+      // A storage failure (e.g. the access level was never widened) must not
+      // throw into the host page. There is no in-page surface to report it
+      // to -- the export page is what reports "no session found" -- so this
+      // is swallowed the same way an incomplete header set is below.
+    })
   } catch {
     // An incomplete header set simply means this was not the request we want.
   }

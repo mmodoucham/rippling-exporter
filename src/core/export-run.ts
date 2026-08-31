@@ -46,6 +46,32 @@ async function collectRefs(
   return groups.flat()
 }
 
+// listInvoices paginates by page number over a server-side sort; if the
+// underlying set shifts between pages, the same record can be returned
+// twice, producing two DocumentRefs with an identical relativePathFor. If
+// that reaches buildZip it throws and discards every already-paid-for
+// download, so de-duplicate here -- before any network cost is paid -- and
+// keep the first occurrence of each path. buildZip's throw stays in place
+// as a backstop for any other source of collisions.
+function dedupeRefs(refs: readonly DocumentRef[]): readonly DocumentRef[] {
+  const seen = new Set<string>()
+  const kept: DocumentRef[] = []
+  let dropped = 0
+  for (const ref of refs) {
+    const path = relativePathFor(ref)
+    if (seen.has(path)) {
+      dropped += 1
+      continue
+    }
+    seen.add(path)
+    kept.push(ref)
+  }
+  if (dropped > 0) {
+    logger.warn('dropped duplicate documents before download', { count: dropped })
+  }
+  return kept
+}
+
 async function fetchOne(ref: DocumentRef, download: Downloader): Promise<Descriptor> {
   try {
     const bytes = await download(ref.url, ref.extension)
@@ -64,10 +90,8 @@ export async function runExport(
   sink: Sink,
   onProgress?: ProgressFn,
 ): Promise<RunResult> {
-  const refs = filterByRange(
-    await collectRefs(options, lister),
-    options.range.from,
-    options.range.to,
+  const refs = dedupeRefs(
+    filterByRange(await collectRefs(options, lister), options.range.from, options.range.to),
   )
   logger.info('documents selected', { count: refs.length })
 

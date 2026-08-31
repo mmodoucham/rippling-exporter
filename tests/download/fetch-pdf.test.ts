@@ -40,12 +40,14 @@ describe('fetchDocument', () => {
   })
 
   it('rejects a response that is not a PDF', async () => {
-    const impl = vi.fn().mockResolvedValue(new Response(new TextEncoder().encode('<html>')))
+    const impl = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(new TextEncoder().encode('<html>'))),
+    )
     await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/not a PDF/)
   })
 
   it('rejects an empty response body', async () => {
-    const impl = vi.fn().mockResolvedValue(new Response(new Uint8Array()))
+    const impl = vi.fn().mockImplementation(() => Promise.resolve(new Response(new Uint8Array())))
     await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/empty/)
   })
 
@@ -54,5 +56,53 @@ describe('fetchDocument', () => {
     await expect(
       fetchDocument('https://x.test/a.pdf?Signature=SECRET', impl),
     ).rejects.not.toThrow(/SECRET/)
+  })
+
+  it('sanitizes error messages from fetchImpl that contain the signed URL', async () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const impl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(`fetch failed for ${url}`))
+      .mockResolvedValueOnce(ok())
+    const bytes = await fetchDocument(url, impl)
+    expect(bytes.length).toBeGreaterThan(0)
+  })
+
+  it('does not leak Signature= query parameter from error messages', async () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const impl = vi.fn().mockRejectedValue(new Error(`fetch failed for ${url}`))
+    await expect(fetchDocument(url, impl)).rejects.not.toThrow(/Signature=/)
+  })
+
+  it('does not leak SECRET from error messages when error is plain string', async () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const impl = vi.fn().mockRejectedValue(`fetch failed for ${url}`)
+    await expect(fetchDocument(url, impl)).rejects.not.toThrow(/SECRET/)
+  })
+
+  it('keeps the redacted host and path in error messages', async () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const impl = vi.fn().mockRejectedValue(new Error(`fetch failed for ${url}`))
+    await expect(fetchDocument(url, impl)).rejects.toThrow(/https:\/\/x\.test\/a\.pdf/)
+  })
+
+  it('rejects a response with mismatched content-length', async () => {
+    const impl = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(PDF, { headers: { 'content-length': '999' } })),
+    )
+    await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/content-length/)
+  })
+
+  it('accepts a response with matching content-length', async () => {
+    const impl = vi.fn().mockResolvedValue(
+      new Response(PDF, { headers: { 'content-length': String(PDF.length) } }),
+    )
+    const bytes = await fetchDocument('https://x.test/a.pdf', impl)
+    expect(bytes.length).toBe(PDF.length)
+  })
+
+  it('accepts a response with no content-length header', async () => {
+    const bytes = await fetchDocument('https://x.test/a.pdf', vi.fn().mockResolvedValue(ok()))
+    expect(bytes.length).toBeGreaterThan(0)
   })
 })

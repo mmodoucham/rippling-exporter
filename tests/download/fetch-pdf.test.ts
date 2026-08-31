@@ -105,4 +105,47 @@ describe('fetchDocument', () => {
     const bytes = await fetchDocument('https://x.test/a.pdf', vi.fn().mockResolvedValue(ok()))
     expect(bytes.length).toBeGreaterThan(0)
   })
+
+  it('accepts gzip-encoded response with mismatched content-length', async () => {
+    const impl = vi.fn().mockResolvedValue(
+      new Response(PDF, {
+        headers: { 'content-encoding': 'gzip', 'content-length': '999' },
+      }),
+    )
+    const bytes = await fetchDocument('https://x.test/a.pdf', impl)
+    expect(bytes.length).toBeGreaterThan(0)
+  })
+
+  it('rejects identity-encoded response with mismatched content-length', async () => {
+    const impl = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(PDF, {
+          headers: { 'content-encoding': 'identity', 'content-length': '999' },
+        }),
+      ),
+    )
+    await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/content-length/)
+  })
+
+  it('does not leak percent-encoded signature value in errors', async () => {
+    const encoded = 'https://x.test/a.pdf?Signature%3DSECRET'
+    const impl = vi.fn().mockRejectedValue(new Error(`failed for ${encoded}`))
+    await expect(fetchDocument(encoded, impl)).rejects.not.toThrow(/SECRET/)
+  })
+
+  it('does not leak bare query string signature in errors', async () => {
+    const impl = vi.fn().mockRejectedValue(new Error('error: Signature=SECRET&Key-Pair-Id=K1'))
+    await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.not.toThrow(/SECRET/)
+  })
+
+  it('does not leak signature with reordered query parameters', async () => {
+    const url = 'https://x.test/a.pdf?Key-Pair-Id=K1&Signature=SECRET&Expires=1'
+    const impl = vi.fn().mockRejectedValue(new Error(`failed for ${url}`))
+    await expect(fetchDocument(url, impl)).rejects.not.toThrow(/SECRET/)
+  })
+
+  it('keeps diagnosable context when scrubbing signatures', async () => {
+    const impl = vi.fn().mockRejectedValue(new Error('download from https://x.test/a.pdf failed, Signature=SECRET'))
+    await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/x\.test/)
+  })
 })

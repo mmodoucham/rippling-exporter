@@ -18,12 +18,26 @@ const sleep = (ms: number): Promise<void> =>
 
 function safeMessage(error: unknown, url: string): string {
   const raw = error instanceof Error ? error.message : String(error)
-  return raw.split(url).join(redactUrl(url))
+  let msg = raw.split(url).join(redactUrl(url))
+  // Scrub signed parameter values: Expires, Signature, Key-Pair-Id
+  msg = msg.replace(/(?:Expires|Signature|Key-Pair-Id)(?:%3D|=)[^&\s"'`]*/gi, (match) => {
+    const eqIdx = match.indexOf('=') > -1 ? match.indexOf('=') : match.indexOf('%3D') + 2
+    return match.substring(0, eqIdx + 1) + 'REDACTED'
+  })
+  return msg
 }
 
-function assertPdf(bytes: Uint8Array, url: string, contentLength?: number): void {
+function assertPdf(
+  bytes: Uint8Array,
+  url: string,
+  contentLength?: number,
+  contentEncoding?: string,
+): void {
   if (bytes.length === 0) throw new Error(`empty response body for ${redactUrl(url)}`)
-  if (contentLength !== undefined && contentLength !== bytes.length) {
+  // Only check content-length if no encoding or identity encoding (not gzip, br, etc.)
+  const shouldCheckLength =
+    !contentEncoding || contentEncoding.toLowerCase() === 'identity'
+  if (shouldCheckLength && contentLength !== undefined && contentLength !== bytes.length) {
     throw new Error(`content-length mismatch for ${redactUrl(url)}`)
   }
   const head = new TextDecoder().decode(bytes.slice(0, MAGIC.length))
@@ -44,7 +58,13 @@ export async function fetchDocument(
       if (!response.ok) throw new Error(`HTTP ${response.status} for ${redactUrl(url)}`)
       const bytes = new Uint8Array(await response.arrayBuffer())
       const contentLength = response.headers.get('content-length')
-      assertPdf(bytes, url, contentLength ? parseInt(contentLength, 10) : undefined)
+      const contentEncoding = response.headers.get('content-encoding')
+      assertPdf(
+        bytes,
+        url,
+        contentLength ? parseInt(contentLength, 10) : undefined,
+        contentEncoding ?? undefined,
+      )
       return bytes
     } catch (error) {
       if (error instanceof ExpiredUrlError) throw error

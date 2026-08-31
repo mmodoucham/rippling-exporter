@@ -55,6 +55,29 @@ describe('refsFromInvoice', () => {
   it('returns no refs when the invoice has no PDF', () => {
     expect(refsFromInvoice({ ...invoice, invoice: null, attachments: [] }, true)).toHaveLength(0)
   })
+
+  it('emits attachment refs when invoice is null but attachments exist', () => {
+    const recordWithAttachmentOnly: InvoiceRecord = {
+      ...invoice,
+      invoice: null,
+      attachments: [{ url: 'https://prod-images.rippling.com/abc.pdf?Signature=s', type: 'pdf' }],
+    }
+    const refs = refsFromInvoice(recordWithAttachmentOnly, true)
+    expect(refs).toHaveLength(1)
+    expect(refs[0]).toMatchObject({
+      kind: 'invoice-attachment',
+      id: expect.stringMatching(/_att1$/),
+    })
+  })
+
+  it('returns no refs when invoice is null and attachments not requested', () => {
+    const recordWithAttachmentOnly: InvoiceRecord = {
+      ...invoice,
+      invoice: null,
+      attachments: [{ url: 'https://prod-images.rippling.com/abc.pdf?Signature=s', type: 'pdf' }],
+    }
+    expect(refsFromInvoice(recordWithAttachmentOnly, false)).toHaveLength(0)
+  })
 })
 
 describe('refFromPaystub', () => {

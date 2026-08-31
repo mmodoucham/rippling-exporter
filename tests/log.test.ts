@@ -111,6 +111,7 @@ describe('log sink', () => {
 describe('logger', () => {
   afterEach(() => {
     setLogSink(() => {})
+    vi.restoreAllMocks()
   })
 
   it('logger.info delivers correct level and msg to sink', () => {
@@ -171,5 +172,31 @@ describe('logger', () => {
     expect(lines[0]?.msg).toBe('first')
     expect(lines[1]?.msg).toBe('second')
     expect(lines[2]?.msg).toBe('third')
+  })
+
+  it('logger output reaches installed sink and nothing else', () => {
+    const lines: LogLine[] = []
+    setLogSink((line) => lines.push(line))
+
+    const stderrSpy = vi.spyOn(process.stderr, 'write')
+    const stdoutSpy = vi.spyOn(process.stdout, 'write')
+    const consoleLogSpy = vi.spyOn(console, 'log')
+    const consoleWarnSpy = vi.spyOn(console, 'warn')
+    const consoleErrorSpy = vi.spyOn(console, 'error')
+
+    logger.info('info message')
+    logger.warn('warn message')
+    logger.error('error message')
+
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toEqual({ level: 'info', msg: 'info message', fields: {} })
+    expect(lines[1]).toEqual({ level: 'warn', msg: 'warn message', fields: {} })
+    expect(lines[2]).toEqual({ level: 'error', msg: 'error message', fields: {} })
+
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(stdoutSpy).not.toHaveBeenCalled()
+    expect(consoleLogSpy).not.toHaveBeenCalled()
+    expect(consoleWarnSpy).not.toHaveBeenCalled()
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 })

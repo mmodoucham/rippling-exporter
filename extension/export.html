@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rippling Exporter</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 2rem auto; max-width: 40rem; }
+      label { display: block; margin: 0.75rem 0 0.25rem; font-weight: 600; }
+      input[type="date"], input[type="number"] { padding: 0.4rem; font: inherit; }
+      button { margin-top: 1rem; padding: 0.5rem 1rem; font: inherit; cursor: pointer; }
+      button[disabled] { cursor: default; opacity: 0.6; }
+      #status { margin-top: 1rem; }
+      #failures { color: #a00; margin-top: 1rem; }
+      ul { padding-left: 1.2rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Rippling Exporter</h1>
+    <p id="session-state">Checking for a Rippling session…</p>
+    <label for="from">Start date</label>
+    <input id="from" type="date" />
+    <label for="to">End date</label>
+    <input id="to" type="date" />
+    <label><input id="attachments" type="checkbox" checked /> Include invoice attachments</label>
+    <label><input id="invoices" type="checkbox" checked /> Invoices</label>
+    <label><input id="paystubs" type="checkbox" checked /> Pay stubs</label>
+    <button id="start" disabled>Export</button>
+    <p id="status"></p>
+    <div id="failures"></div>
+    <script type="module" src="dist/export-page.js"></script>
+  </body>
+</html>

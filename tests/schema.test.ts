@@ -63,6 +63,54 @@ describe('invoiceRecordSchema', () => {
     }
   })
 
+  it('accepts a full ISO datetime invoiceDate', () => {
+    const input = {
+      id: '68c1a2b3d4e5f60718293a4b',
+      invoiceNumber: 'INV_03/10/2026_3',
+      invoiceDate: '2026-03-10T00:00:00Z',
+      invoice: 'https://secured-assets.ripplingcdn.com/us1/a/x-sensitive.pdf?Signature=s',
+      attachments: [],
+    }
+    const result = invoiceRecordSchema.safeParse(input)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts a bare YYYY-MM-DD invoiceDate', () => {
+    const input = {
+      id: '68c1a2b3d4e5f60718293a4b',
+      invoiceNumber: 'INV_03/10/2026_3',
+      invoiceDate: '2026-03-10',
+      invoice: 'https://secured-assets.ripplingcdn.com/us1/a/x-sensitive.pdf?Signature=s',
+      attachments: [],
+    }
+    const result = invoiceRecordSchema.safeParse(input)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects an invoiceDate in MM/DD/YYYY format', () => {
+    const input = {
+      id: '68c1a2b3d4e5f60718293a4b',
+      invoiceNumber: 'INV_03/10/2026_3',
+      invoiceDate: '03/10/2026',
+      invoice: 'https://secured-assets.ripplingcdn.com/us1/a/x-sensitive.pdf?Signature=s',
+      attachments: [],
+    }
+    const result = invoiceRecordSchema.safeParse(input)
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an empty invoiceDate', () => {
+    const input = {
+      id: '68c1a2b3d4e5f60718293a4b',
+      invoiceNumber: 'INV_03/10/2026_3',
+      invoiceDate: '',
+      invoice: 'https://secured-assets.ripplingcdn.com/us1/a/x-sensitive.pdf?Signature=s',
+      attachments: [],
+    }
+    const result = invoiceRecordSchema.safeParse(input)
+    expect(result.success).toBe(false)
+  })
+
   it('rejects a non-URL string in invoice', () => {
     const input = {
       id: '68c1a2b3d4e5f60718293a4b',

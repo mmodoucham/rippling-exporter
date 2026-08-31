@@ -8,7 +8,7 @@ export const attachmentSchema = z.object({
 export const invoiceRecordSchema = z.object({
   id: z.string().min(1),
   invoiceNumber: z.string().min(1),
-  invoiceDate: z.string().min(1),
+  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
   invoice: z.string().url().nullable(),
   attachments: z.array(attachmentSchema).default([]),
 })

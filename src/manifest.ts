@@ -48,6 +48,7 @@ export function withEntry(manifest: Manifest, entry: ManifestEntry): Manifest {
   return {
     ...manifest,
     entries: [...manifest.entries.filter((e) => e.id !== entry.id), entry],
+    failures: manifest.failures.filter((f) => f.id !== entry.id),
   }
 }
 

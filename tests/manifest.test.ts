@@ -58,6 +58,26 @@ describe('manifest', () => {
     expect(base.entries).toHaveLength(0)
   })
 
+  it('drops an earlier failure for the same id once an entry is added', () => {
+    const withFailureManifest = withFailure(emptyManifest(), ref.id, 'HTTP 500')
+    const result = withEntry(withFailureManifest, entryFor('invoices/x.pdf'))
+    expect(result.failures).toEqual([])
+    expect(result.entries).toHaveLength(1)
+  })
+
+  it('keeps a failure for a different id when an entry is added', () => {
+    const withFailureManifest = withFailure(emptyManifest(), 'other-id', 'HTTP 500')
+    const result = withEntry(withFailureManifest, entryFor('invoices/x.pdf'))
+    expect(result.failures).toEqual([{ id: 'other-id', reason: 'HTTP 500' }])
+    expect(result.entries).toHaveLength(1)
+  })
+
+  it('does not mutate the original manifest when pruning a failure via withEntry', () => {
+    const withFailureManifest = withFailure(emptyManifest(), ref.id, 'HTTP 500')
+    withEntry(withFailureManifest, entryFor('invoices/x.pdf'))
+    expect(withFailureManifest.failures).toEqual([{ id: ref.id, reason: 'HTTP 500' }])
+  })
+
   it('records failures separately from entries', () => {
     const m = withFailure(emptyManifest(), 'abc123', 'HTTP 500')
     expect(m.failures).toEqual([{ id: 'abc123', reason: 'HTTP 500' }])

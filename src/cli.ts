@@ -31,7 +31,7 @@ async function main(): Promise<number> {
         listInvoices: () => listInvoices(session),
         listPaystubs: () => listPaystubs(session),
       },
-      (url) => fetchDocument(url),
+      (url, extension) => fetchDocument(url, fetch, extension),
     )
     process.stdout.write(`${formatReport(result, config.out)}\n`)
     return result.failed > 0 ? 1 : 0

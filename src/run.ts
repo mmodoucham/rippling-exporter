@@ -21,7 +21,7 @@ export interface Lister {
   listPaystubs(): Promise<readonly PaystubRecord[]>
 }
 
-export type Downloader = (url: string) => Promise<Uint8Array>
+export type Downloader = (url: string, extension: string) => Promise<Uint8Array>
 
 type Descriptor =
   | { readonly ref: DocumentRef; readonly outcome: 'skipped' }
@@ -58,7 +58,7 @@ async function fetchOne(
     return { ref, outcome: 'skipped' }
   }
   try {
-    const bytes = await download(ref.url)
+    const bytes = await download(ref.url, ref.extension)
     await saveDocument(config.out, ref, bytes)
     logger.info('saved', { path: relativePathFor(ref), bytes: bytes.length })
     return { ref, outcome: 'downloaded', bytes }

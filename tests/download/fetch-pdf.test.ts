@@ -148,4 +148,29 @@ describe('fetchDocument', () => {
     const impl = vi.fn().mockRejectedValue(new Error('download from https://x.test/a.pdf failed, Signature=SECRET'))
     await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/x\.test/)
   })
+
+  it('downloads a non-PDF body successfully when the expected extension is not pdf', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const impl = vi.fn().mockResolvedValue(new Response(png))
+    const bytes = await fetchDocument('https://x.test/a.png', impl, 'png')
+    expect(bytes).toEqual(png)
+  })
+
+  it('still rejects non-PDF bytes when the expected extension is pdf', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+    const impl = vi.fn().mockImplementation(() => Promise.resolve(new Response(png)))
+    await expect(fetchDocument('https://x.test/a.pdf', impl, 'pdf')).rejects.toThrow(/not a PDF/)
+  })
+
+  it('still rejects an empty body regardless of the expected extension', async () => {
+    const impl = vi.fn().mockImplementation(() => Promise.resolve(new Response(new Uint8Array())))
+    await expect(fetchDocument('https://x.test/a.png', impl, 'png')).rejects.toThrow(/empty/)
+  })
+
+  it('defaults the expected extension to pdf when omitted', async () => {
+    const impl = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(new TextEncoder().encode('<html>'))),
+    )
+    await expect(fetchDocument('https://x.test/a.pdf', impl)).rejects.toThrow(/not a PDF/)
+  })
 })

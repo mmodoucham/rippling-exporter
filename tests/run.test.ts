@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { ExportConfig } from '../src/config.js'
+import { fetchDocument } from '../src/download/fetch-pdf.js'
 import { loadManifest } from '../src/manifest.js'
 import { runExport } from '../src/run.js'
 import type { InvoiceRecord, PaystubRecord } from '../src/schema.js'
@@ -205,5 +206,55 @@ describe('runExport', () => {
     })
     const result = await runExport(configFor(root, { concurrency: 3 }), lister, download)
     expect(result).toEqual({ downloaded: 2, skipped: 0, failed: 1 })
+  })
+
+  it('completes a run with a non-PDF attachment instead of failing it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rex-'))
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+    const withPngAttachment: readonly InvoiceRecord[] = [
+      {
+        id: 'inv-1',
+        invoiceNumber: 'INV_03/10/2026_1',
+        invoiceDate: '2026-03-10T00:00:00Z',
+        invoice: 'https://x.test/ok.pdf',
+        attachments: [{ url: 'https://x.test/photo.png', type: 'png' }],
+      },
+    ]
+    const pngLister = { listInvoices: async () => withPngAttachment, listPaystubs: async () => [] }
+    const fetchImpl = vi.fn().mockImplementation(async (url: string | URL | Request) => {
+      const href = typeof url === 'string' ? url : url.toString()
+      return new Response(href.endsWith('.png') ? png : PDF)
+    })
+    const download = (url: string, extension: string) => fetchDocument(url, fetchImpl, extension)
+    const result = await runExport(configFor(root), pngLister, download)
+    expect(result).toEqual({ downloaded: 2, skipped: 0, failed: 0 })
+  })
+
+  it('drops a manifest failure once a retried document succeeds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rex-'))
+    const single: readonly InvoiceRecord[] = [
+      {
+        id: 'inv-1',
+        invoiceNumber: 'INV_03/10/2026_1',
+        invoiceDate: '2026-03-10T00:00:00Z',
+        invoice: 'https://x.test/ok.pdf',
+        attachments: [{ url: 'https://x.test/boom.pdf', type: 'pdf' }],
+      },
+    ]
+    const oneLister = { listInvoices: async () => single, listPaystubs: async () => [] }
+    const failingDownload = vi.fn().mockImplementation(async (url: string) => {
+      if (url === 'https://x.test/boom.pdf') throw new Error('network error')
+      return PDF
+    })
+    const first = await runExport(configFor(root, { concurrency: 1 }), oneLister, failingDownload)
+    expect(first.failed).toBe(1)
+    expect((await loadManifest(root)).failures).toHaveLength(1)
+
+    const secondDownload = vi.fn().mockResolvedValue(PDF)
+    const second = await runExport(configFor(root, { concurrency: 1 }), oneLister, secondDownload)
+    expect(second.downloaded).toBe(1)
+    const manifest = await loadManifest(root)
+    expect(manifest.failures).toHaveLength(0)
+    expect(manifest.entries.some((e) => e.id === 'inv-1_att1')).toBe(true)
   })
 })

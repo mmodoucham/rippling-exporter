@@ -4,3 +4,4 @@ coverage/
 exports/
 .env
 *.log
+.rippling-exporter/

@@ -1,4 +1,4 @@
-import { logger, redactUrl } from '../log.js'
+import { logger, redactUrl, safeMessage } from '../log.js'
 
 const MAGIC = '%PDF-'
 const ATTEMPTS = 3
@@ -15,17 +15,6 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
-
-function safeMessage(error: unknown, url: string): string {
-  const raw = error instanceof Error ? error.message : String(error)
-  let msg = raw.split(url).join(redactUrl(url))
-  // Scrub signed parameter values: Expires, Signature, Key-Pair-Id
-  msg = msg.replace(/(?:Expires|Signature|Key-Pair-Id)(?:%3D|=)[^&\s"'`]*/gi, (match) => {
-    const eqIdx = match.indexOf('=') > -1 ? match.indexOf('=') : match.indexOf('%3D') + 2
-    return match.substring(0, eqIdx + 1) + 'REDACTED'
-  })
-  return msg
-}
 
 function assertPdf(
   bytes: Uint8Array,

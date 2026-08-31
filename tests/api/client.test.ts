@@ -75,4 +75,21 @@ describe('apiRequest', () => {
     expect(caught?.message).not.toContain('Signature=')
     expect(impl).toHaveBeenCalledTimes(3)
   })
+
+  it('does not leak a signature carried in a non-literal form of the URL (e.g. a proxy error body)', async () => {
+    const url = 'https://x.test/a?Signature=SECRET-VALUE'
+    const impl = vi.fn().mockImplementation(() =>
+      // No origin, no full URL match — just the bare parameters, as a CDN
+      // or proxy error body might embed them.
+      Promise.reject(new Error('upstream said: Signature=SECRET-VALUE&Key-Pair-Id=K1')),
+    )
+    let caught: Error | undefined
+    try {
+      await apiRequest(session, url, schema, {}, impl)
+    } catch (error) {
+      caught = error as Error
+    }
+    expect(caught?.message).not.toContain('SECRET-VALUE')
+    expect(impl).toHaveBeenCalledTimes(3)
+  })
 })

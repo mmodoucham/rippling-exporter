@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { logger, redactUrl } from '../log.js'
+import { logger, redactUrl, safeMessage } from '../log.js'
 
 export interface RipplingSession {
   readonly headers: Readonly<Record<string, string>>
@@ -24,14 +24,6 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
-
-// An upstream error message can embed the full request URL (including any
-// query string). Swap it for the redacted form so nothing sensitive leaks
-// into logs or rejections.
-function safeMessage(error: unknown, url: string): string {
-  const raw = error instanceof Error ? error.message : String(error)
-  return raw.split(url).join(redactUrl(url))
-}
 
 export async function apiRequest<T>(
   session: RipplingSession,

@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest'
-import { redactUrl, logger } from '../src/log.js'
+import { redactUrl, logger, safeMessage } from '../src/log.js'
 
 describe('redactUrl', () => {
   it('strips the query string from a signed asset URL', () => {
@@ -18,6 +18,52 @@ describe('redactUrl', () => {
 
   it('returns a placeholder for an unparseable value', () => {
     expect(redactUrl('not a url')).toBe('<unparseable-url>')
+  })
+})
+
+describe('safeMessage', () => {
+  it('swaps the literal URL in an Error message for its redacted form', () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const message = safeMessage(new Error(`fetch failed for ${url}`), url)
+    expect(message).toContain('https://x.test/a.pdf')
+    expect(message).not.toContain('SECRET')
+  })
+
+  it('scrubs a percent-encoded signature value that survives the literal-URL swap', () => {
+    // The percent-encoded parameter here is not part of the `url` argument,
+    // so the literal-URL swap does not remove it first — this isolates the
+    // regex scrub's %3D-separator branch.
+    const message = safeMessage(
+      new Error('upstream said Signature%3DSECRET while fetching https://x.test/a.pdf'),
+      'https://x.test/a.pdf',
+    )
+    expect(message).not.toContain('SECRET')
+  })
+
+  it('scrubs a bare Signature parameter with no origin in the message', () => {
+    const message = safeMessage(
+      new Error('error: Signature=SECRET&Key-Pair-Id=K1'),
+      'https://x.test/a.pdf',
+    )
+    expect(message).not.toContain('SECRET')
+  })
+
+  it('scrubs signature parameters regardless of their order', () => {
+    const url = 'https://x.test/a.pdf?Key-Pair-Id=K1&Signature=SECRET&Expires=1'
+    const message = safeMessage(new Error(`failed for ${url}`), url)
+    expect(message).not.toContain('SECRET')
+  })
+
+  it('handles a non-Error thrown value', () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const message = safeMessage(`fetch failed for ${url}`, url)
+    expect(message).not.toContain('SECRET')
+  })
+
+  it('keeps the redacted host and path so the message stays diagnosable', () => {
+    const url = 'https://x.test/a.pdf?Expires=1&Signature=SECRET&Key-Pair-Id=K1'
+    const message = safeMessage(new Error(`fetch failed for ${url}`), url)
+    expect(message).toMatch(/https:\/\/x\.test\/a\.pdf/)
   })
 })
 

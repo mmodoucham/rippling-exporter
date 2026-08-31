@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRealCalendarDate, parseDateRange } from '../../src/core/range.js'
+import { isRealCalendarDate, parseDateRange } from '../../src/core/export-options.js'
 
 describe('isRealCalendarDate', () => {
   it('accepts a real date', () => {
@@ -22,6 +22,18 @@ describe('isRealCalendarDate', () => {
 
   it('rejects an out-of-range month', () => {
     expect(isRealCalendarDate('2026-13-01')).toBe(false)
+  })
+
+  it('rejects a string that does not match the date format', () => {
+    expect(isRealCalendarDate('not-a-date')).toBe(false)
+  })
+
+  it('rejects an empty string', () => {
+    expect(isRealCalendarDate('')).toBe(false)
+  })
+
+  it('rejects a date with single-digit month', () => {
+    expect(isRealCalendarDate('2026-3-10')).toBe(false)
   })
 })
 

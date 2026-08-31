@@ -18,6 +18,8 @@ const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/
 export function isRealCalendarDate(value: string): boolean {
   const match = ISO_DAY.exec(value)
   if (match === null) return false
+  // Safe to index: ISO_DAY has three mandatory capture groups with no alternation.
+  // A non-null match guarantees all three are defined strings.
   const year = Number(match[1])
   const month = Number(match[2])
   const day = Number(match[3])

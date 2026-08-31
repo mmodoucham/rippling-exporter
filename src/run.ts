@@ -23,6 +23,11 @@ export interface Lister {
 
 export type Downloader = (url: string) => Promise<Uint8Array>
 
+type Descriptor =
+  | { readonly ref: DocumentRef; readonly outcome: 'skipped' }
+  | { readonly ref: DocumentRef; readonly outcome: 'downloaded'; readonly bytes: Uint8Array }
+  | { readonly ref: DocumentRef; readonly outcome: 'failed'; readonly reason: string }
+
 async function collectRefs(
   config: ExportConfig,
   lister: Lister,
@@ -39,47 +44,59 @@ async function collectRefs(
   return groups.flat()
 }
 
-// Writes the file to disk FIRST, then records the manifest entry, then
-// persists the manifest immediately. This ordering makes a crash mid-run
-// safe: an interruption between the file write and the manifest write
-// simply leaves no entry, so the document is re-downloaded next run rather
-// than being wrongly skipped. Failures are persisted the same way so a
-// failed document is visible after a crash too. Documents are processed
-// serially (see runExport), so there is only ever one manifest write in
-// flight at a time.
-async function processOne(
+// Concurrent phase: touches only the network and the filesystem (the
+// already-downloaded check, the download, and the file write). Never
+// touches the manifest, so many of these can run at once with no risk of
+// concurrent manifest mutation.
+async function fetchOne(
   ref: DocumentRef,
   config: ExportConfig,
   download: Downloader,
   manifest: Manifest,
-): Promise<{ readonly outcome: 'downloaded' | 'skipped' | 'failed'; readonly manifest: Manifest }> {
+): Promise<Descriptor> {
   if (await isAlreadyDownloaded(manifest, config.out, ref)) {
-    return { outcome: 'skipped', manifest }
+    return { ref, outcome: 'skipped' }
   }
   try {
     const bytes = await download(ref.url)
     await saveDocument(config.out, ref, bytes)
     logger.info('saved', { path: relativePathFor(ref), bytes: bytes.length })
-    const updated = withEntry(manifest, {
-      id: ref.id,
-      kind: ref.kind,
-      date: ref.date,
-      path: relativePathFor(ref),
-      sha256: sha256(bytes),
-      bytes: bytes.length,
-      downloadedAt: new Date().toISOString(),
-    })
-    await saveManifest(config.out, updated)
-    return { outcome: 'downloaded', manifest: updated }
+    return { ref, outcome: 'downloaded', bytes }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     logger.error('download failed', { id: ref.id, url: redactUrl(ref.url), reason })
-    const updated = withFailure(manifest, ref.id, reason)
-    await saveManifest(config.out, updated)
-    return { outcome: 'failed', manifest: updated }
+    return { ref, outcome: 'failed', reason }
   }
 }
 
+// Serial phase: folds one batch's descriptors into the manifest one at a
+// time, in the batch's original order. A document's file is always written
+// (in the concurrent phase above) before its manifest entry exists here.
+function foldDescriptor(manifest: Manifest, descriptor: Descriptor): Manifest {
+  if (descriptor.outcome === 'downloaded') {
+    return withEntry(manifest, {
+      id: descriptor.ref.id,
+      kind: descriptor.ref.kind,
+      date: descriptor.ref.date,
+      path: relativePathFor(descriptor.ref),
+      sha256: sha256(descriptor.bytes),
+      bytes: descriptor.bytes.length,
+      downloadedAt: new Date().toISOString(),
+    })
+  }
+  if (descriptor.outcome === 'failed') {
+    return withFailure(manifest, descriptor.ref.id, descriptor.reason)
+  }
+  return manifest
+}
+
+// Each batch runs its downloads concurrently (bounded by config.concurrency)
+// and then folds the results into the manifest serially, persisting once
+// per batch. This makes --concurrency real while keeping the durability
+// property that matters: a document's file is always on disk before its
+// manifest entry exists. The window this widens is that a crash mid-batch
+// can leave up to `concurrency` files on disk without entries yet — safe,
+// since those are simply re-downloaded next run rather than wrongly skipped.
 export async function runExport(
   config: ExportConfig,
   lister: Lister,
@@ -94,13 +111,17 @@ export async function runExport(
 
   for (let i = 0; i < refs.length; i += config.concurrency) {
     const batch = refs.slice(i, i + config.concurrency)
-    for (const ref of batch) {
-      const step = await processOne(ref, config, download, manifest)
-      manifest = step.manifest
-      tally[step.outcome] += 1
+    const descriptors = await Promise.all(
+      batch.map((ref) => fetchOne(ref, config, download, manifest)),
+    )
+    for (const descriptor of descriptors) {
+      manifest = foldDescriptor(manifest, descriptor)
+      tally[descriptor.outcome] += 1
     }
+    await saveManifest(config.out, manifest)
   }
 
+  // Covers the zero-document case, where the loop above never runs.
   await saveManifest(config.out, manifest)
   return { downloaded: tally.downloaded, skipped: tally.skipped, failed: tally.failed }
 }

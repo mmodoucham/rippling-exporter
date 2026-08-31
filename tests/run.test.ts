@@ -166,4 +166,44 @@ describe('runExport', () => {
     expect(second.skipped).toBe(1)
     expect(secondDownload.mock.calls.map((c) => c[0])).not.toContain('https://x.test/ok.pdf')
   })
+
+  it('runs downloads within a batch concurrently when concurrency allows it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rex-'))
+    let inFlight = 0
+    let maxInFlight = 0
+    const download = vi.fn().mockImplementation(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      inFlight -= 1
+      return PDF
+    })
+    await runExport(configFor(root, { concurrency: 4 }), lister, download)
+    expect(maxInFlight).toBeGreaterThan(1)
+  })
+
+  it('processes at most one document at a time when concurrency is 1', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rex-'))
+    let inFlight = 0
+    let maxInFlight = 0
+    const download = vi.fn().mockImplementation(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      return PDF
+    })
+    await runExport(configFor(root, { concurrency: 1 }), lister, download)
+    expect(maxInFlight).toBe(1)
+  })
+
+  it('lets sibling documents in the same concurrent batch complete after one fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rex-'))
+    const download = vi.fn().mockImplementation(async (url: string) => {
+      if (url === 'https://x.test/in.pdf') throw new Error('HTTP 500')
+      return PDF
+    })
+    const result = await runExport(configFor(root, { concurrency: 3 }), lister, download)
+    expect(result).toEqual({ downloaded: 2, skipped: 0, failed: 1 })
+  })
 })

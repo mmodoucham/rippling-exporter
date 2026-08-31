@@ -1,3 +1,4 @@
+import { REQUIRED_HEADERS } from '../auth/capture-headers.js'
 import { CAPTURE_MESSAGE } from './protocol.js'
 
 // Runs in the page's own JavaScript context so it sees the fetch calls
@@ -5,14 +6,21 @@ import { CAPTURE_MESSAGE } from './protocol.js'
 // it captures to the isolated-world bridge instead.
 const original = window.fetch
 
+function requestUrl(request: RequestInfo | URL): string | null {
+  if (typeof request === 'string') return request
+  if (request instanceof URL) return request.href
+  if (request instanceof Request) return request.url
+  return null
+}
+
 window.fetch = async function patched(
   this: typeof globalThis,
   ...args: Parameters<typeof fetch>
 ): Promise<Response> {
   try {
     const request = args[0]
-    const url = typeof request === 'string' ? request : (request as Request).url
-    if (url.includes('/api/')) {
+    const url = requestUrl(request)
+    if (url !== null && url.includes('/api/')) {
       const collected: Record<string, string> = {}
       if (request instanceof Request) {
         request.headers.forEach((value, key) => {
@@ -25,12 +33,21 @@ window.fetch = async function patched(
           collected[key] = value
         })
       }
-      if (collected['authorization'] !== undefined) {
-        window.postMessage({ type: CAPTURE_MESSAGE, headers: collected }, window.origin)
+      const narrowed: Record<string, string> = {}
+      for (const name of REQUIRED_HEADERS) {
+        const value = collected[name]
+        if (value !== undefined) narrowed[name] = value
+      }
+      if (narrowed['authorization'] !== undefined) {
+        window.postMessage({ type: CAPTURE_MESSAGE, headers: narrowed }, window.origin)
       }
     }
   } catch {
     // Capture must never break the host page.
   }
-  return original.apply(this, args)
+  // The genuine fetch must always run. Native fetch requires its receiver to
+  // be window (or another Window/WorkerGlobalScope) rather than whatever
+  // `this` the caller happened to use, so bind explicitly rather than
+  // forwarding the caller's `this`.
+  return original.apply(window, args)
 }

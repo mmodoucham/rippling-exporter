@@ -35,4 +35,28 @@ describe('parseConfig', () => {
   it('honours attachments:false', () => {
     expect(parseConfig({ ...base, attachments: false }).attachments).toBe(false)
   })
+
+  it('rejects non-existent calendar dates', () => {
+    expect(() => parseConfig({ ...base, from: '2026-02-30' })).toThrow(/not a real calendar date/)
+    expect(() => parseConfig({ ...base, from: '2026-04-31' })).toThrow(/not a real calendar date/)
+  })
+
+  it('accepts a real leap day', () => {
+    const cfg = parseConfig({ ...base, from: '2024-02-29' })
+    expect(cfg.from).toBe('2024-02-29')
+  })
+
+  it('rejects fractional and partially-numeric concurrency values', () => {
+    expect(() => parseConfig({ ...base, concurrency: '2.5' })).toThrow(/concurrency/)
+    expect(() => parseConfig({ ...base, concurrency: '4abc' })).toThrow(/concurrency/)
+  })
+
+  it('accepts a valid concurrency string and returns it as a number', () => {
+    expect(parseConfig({ ...base, concurrency: '8' }).concurrency).toBe(8)
+  })
+
+  it('rejects empty and whitespace-only types values', () => {
+    expect(() => parseConfig({ ...base, types: '' })).toThrow(/must name at least one/)
+    expect(() => parseConfig({ ...base, types: '   ' })).toThrow(/must name at least one/)
+  })
 })

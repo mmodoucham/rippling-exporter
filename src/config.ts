@@ -6,7 +6,20 @@ export type DocumentType = (typeof DOCUMENT_TYPES)[number]
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'dates must be in YYYY-MM-DD format')
-  .refine((v) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)), 'not a real calendar date')
+  .refine((v) => {
+    const match = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return false
+    // match is non-null here; accessing groups is safe
+    const y = Number.parseInt(match[1]!, 10)
+    const m = Number.parseInt(match[2]!, 10)
+    const d = Number.parseInt(match[3]!, 10)
+    const date = new Date(Date.UTC(y, m - 1, d))
+    return (
+      date.getUTCFullYear() === y &&
+      date.getUTCMonth() + 1 === m &&
+      date.getUTCDate() === d
+    )
+  }, 'not a real calendar date')
 
 const rawSchema = z.object({
   from: isoDate,
@@ -41,7 +54,15 @@ function parseTypes(value: string | undefined): readonly DocumentType[] {
 
 function parseConcurrency(value: string | number | undefined): number {
   if (value === undefined) return 4
-  const n = typeof value === 'number' ? value : Number.parseInt(value, 10)
+  let n: number
+  if (typeof value === 'number') {
+    n = value
+  } else {
+    if (!/^\d+$/.test(value)) {
+      throw new Error('--concurrency must be an integer between 1 and 16')
+    }
+    n = Number.parseInt(value, 10)
+  }
   if (!Number.isInteger(n) || n < 1 || n > 16) {
     throw new Error('--concurrency must be an integer between 1 and 16')
   }

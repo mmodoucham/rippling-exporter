@@ -2,16 +2,21 @@
   "name": "rippling-exporter",
   "version": "0.1.0",
   "type": "module",
-  "bin": { "rippling-exporter": "./dist/cli.js" },
+  "bin": {
+    "rippling-exporter": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.test.json"
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "commander": "^12.1.0",
+    "fflate": "^0.8.3",
     "playwright": "^1.48.0",
     "zod": "^3.23.8"
   },

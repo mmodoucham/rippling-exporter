@@ -63,8 +63,35 @@ describe('listInvoices', () => {
     await expect(listInvoices(session, impl)).rejects.toBeInstanceOf(SessionExpiredError)
   })
 
-  it('throws when the response does not match the schema', async () => {
-    const impl = vi.fn().mockResolvedValue(jsonResponse('{"data":[{"id":1}],"cursor":null}'))
+  it('throws when the response does not match the schema, without retrying', async () => {
+    const impl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse('{"data":[{"id":1}],"cursor":null}'))
     await expect(listInvoices(session, impl)).rejects.toThrow(/schema|invalid/i)
+    expect(impl).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops at the page cap rather than looping forever on a server that never returns a null cursor', async () => {
+    const impl = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        jsonResponse(
+          JSON.stringify({
+            cursor: 'always-more',
+            data: [
+              {
+                id: '68c1a2b3d4e5f60718293a01',
+                invoiceNumber: 'INV_1',
+                invoiceDate: '2026-01-01T00:00:00Z',
+                invoice: null,
+                attachments: [],
+              },
+            ],
+          }),
+        ),
+      ),
+    )
+    const records = await listInvoices(session, impl)
+    expect(impl).toHaveBeenCalledTimes(100)
+    expect(records).toHaveLength(100)
   })
 })

@@ -25,6 +25,14 @@ const sleep = (ms: number): Promise<void> =>
     setTimeout(resolve, ms)
   })
 
+// An upstream error message can embed the full request URL (including any
+// query string). Swap it for the redacted form so nothing sensitive leaks
+// into logs or rejections.
+function safeMessage(error: unknown, url: string): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return raw.split(url).join(redactUrl(url))
+}
+
 export async function apiRequest<T>(
   session: RipplingSession,
   url: string,
@@ -55,7 +63,7 @@ export async function apiRequest<T>(
     } catch (error) {
       if (error instanceof SessionExpiredError || error instanceof SchemaMismatchError)
         throw error
-      lastError = error instanceof Error ? error : new Error(String(error))
+      lastError = new Error(safeMessage(error, url))
       if (attempt < ATTEMPTS) {
         logger.warn('API request failed, retrying', {
           url: redactUrl(url),

@@ -1,0 +1,25 @@
+{
+  "cursor": "cursor-page-2",
+  "visibleRowCount": 2,
+  "perPage": 100,
+  "data": [
+    {
+      "id": "68c1a2b3d4e5f60718293a01",
+      "invoiceNumber": "INV_03/10/2026_3",
+      "invoiceDate": "2026-03-10T00:00:00Z",
+      "state": "PAID",
+      "invoice": "https://secured-assets.ripplingcdn.com/us1/a/one-sensitive.pdf?Signature=x",
+      "attachments": []
+    },
+    {
+      "id": "68c1a2b3d4e5f60718293a02",
+      "invoiceNumber": "INV_03/23/2026_5",
+      "invoiceDate": "2026-03-23T00:00:00Z",
+      "state": "PAID",
+      "invoice": "https://secured-assets.ripplingcdn.com/us1/a/two-sensitive.pdf?Signature=x",
+      "attachments": [
+        { "url": "https://prod-images.rippling.com/att1.pdf?Signature=x", "type": "pdf" }
+      ]
+    }
+  ]
+}

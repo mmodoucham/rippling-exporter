@@ -1,0 +1,22 @@
+[
+  {
+    "id": "68c1a2b3d4e5f60718293b01",
+    "stubName": "Mar 1, 2026 – Mar 15, 2026 - Acme Payroll Inc",
+    "checkDate": "2026-03-13",
+    "entityName": "Acme Payroll Inc",
+    "netPay": 1500,
+    "pdfFileForEE": "https://secured-assets.ripplingcdn.com/us1/b/one-sensitive.pdf?Signature=x",
+    "isCorrected": false,
+    "sourceApplication": "GLOBAL_PAYROLL"
+  },
+  {
+    "id": "68c1a2b3d4e5f60718293b02",
+    "stubName": "Aug 16, 2026 – Aug 31, 2026 - Acme Payroll Inc",
+    "checkDate": "2026-08-31",
+    "entityName": "Acme Payroll Inc",
+    "netPay": 1500,
+    "pdfFileForEE": "https://secured-assets.ripplingcdn.com/us1/b/two-sensitive.pdf?Signature=x",
+    "isCorrected": false,
+    "sourceApplication": "GLOBAL_PAYROLL"
+  }
+]

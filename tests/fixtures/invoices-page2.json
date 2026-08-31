@@ -1,0 +1,15 @@
+{
+  "cursor": null,
+  "visibleRowCount": 1,
+  "perPage": 100,
+  "data": [
+    {
+      "id": "68c1a2b3d4e5f60718293a03",
+      "invoiceNumber": "INV_08/25/2026_33",
+      "invoiceDate": "2026-08-25T00:00:00Z",
+      "state": "PAID",
+      "invoice": "https://secured-assets.ripplingcdn.com/us1/a/three-sensitive.pdf?Signature=x",
+      "attachments": []
+    }
+  ]
+}

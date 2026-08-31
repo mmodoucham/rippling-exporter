@@ -8,8 +8,56 @@ import { setLogSink } from '../log.js'
 import type { RipplingSession } from '../api/client.js'
 import { readSession } from './session-store.js'
 
+interface DownloadDelta {
+  readonly id: number
+  readonly state?: { readonly current: string }
+}
+
 declare const chrome: {
-  downloads: { download(options: { url: string; filename: string }): Promise<number> }
+  downloads: {
+    download(options: { url: string; filename: string }): Promise<number>
+    onChanged: {
+      addListener(fn: (delta: DownloadDelta) => void): void
+      removeListener(fn: (delta: DownloadDelta) => void): void
+    }
+  }
+}
+
+// chrome.downloads.download() resolves once the download is QUEUED, not once
+// Chrome has finished reading the blob -- revoking the object URL right after
+// that await can truncate or fail large archives. Instead we keep the URL
+// alive until chrome.downloads.onChanged reports this download's id as
+// complete or interrupted. A fallback timer guards against that event never
+// firing, so a stuck download cannot leak the archive forever.
+const REVOKE_FALLBACK_MS = 5 * 60 * 1000
+
+function downloadAndRevoke(url: string, filename: string): Promise<void> {
+  return new Promise((resolve) => {
+    let downloadId: number | undefined
+    let done = false
+
+    const onChanged = (delta: DownloadDelta): void => {
+      if (downloadId === undefined || delta.id !== downloadId) return
+      const state = delta.state?.current
+      if (state === 'complete' || state === 'interrupted') cleanup()
+    }
+
+    function cleanup(): void {
+      if (done) return
+      done = true
+      chrome.downloads.onChanged.removeListener(onChanged)
+      clearTimeout(timer)
+      URL.revokeObjectURL(url)
+      resolve()
+    }
+
+    const timer = setTimeout(cleanup, REVOKE_FALLBACK_MS)
+
+    chrome.downloads.onChanged.addListener(onChanged)
+    void chrome.downloads.download({ url, filename }).then((id) => {
+      downloadId = id
+    })
+  })
 }
 
 const $ = (id: string): HTMLElement => {
@@ -95,13 +143,13 @@ async function run(session: RipplingSession): Promise<void> {
     }
 
     const archive = buildZip(entries)
-    const blob = new Blob([new Uint8Array(archive)], { type: 'application/zip' })
+    // zipSync (fflate) always returns a Uint8Array backed by a freshly
+    // allocated ArrayBuffer, never a SharedArrayBuffer view, so this
+    // assertion is safe and avoids copying a potentially multi-megabyte
+    // archive just to satisfy BlobPart's stricter generic typing.
+    const blob = new Blob([archive as Uint8Array<ArrayBuffer>], { type: 'application/zip' })
     const url = URL.createObjectURL(blob)
-    await chrome.downloads.download({
-      url,
-      filename: `rippling-export-${range.from}-to-${range.to}.zip`,
-    })
-    URL.revokeObjectURL(url)
+    await downloadAndRevoke(url, `rippling-export-${range.from}-to-${range.to}.zip`)
 
     setStatus(`Saved ${result.downloaded} document(s). ${result.failed} failed.`)
     renderFailures(result.failures)

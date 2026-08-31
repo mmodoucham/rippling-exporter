@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearSession, readSession, storeSession } from '../../src/extension/session-store.js'
+import { clearSession, readSession } from '../../src/extension/session-store.js'
+import { storeSession } from '../../src/extension/session-write.js'
 import type { RipplingSession } from '../../src/api/client.js'
 
 const session: RipplingSession = {
@@ -42,6 +43,14 @@ describe('session-store', () => {
   })
 
   it('round-trips a stored session', async () => {
+    await storeSession(session)
+    expect(await readSession()).toEqual(session)
+  })
+
+  it('round-trips through the same key when storeSession comes from session-write.ts and readSession from session-store.ts', async () => {
+    // storeSession (session-write.ts, no Zod) and readSession (session-store.ts,
+    // Zod-validated) must agree on SESSION_KEY from protocol.ts, or a session
+    // written by the content script would never be found by the export page.
     await storeSession(session)
     expect(await readSession()).toEqual(session)
   })

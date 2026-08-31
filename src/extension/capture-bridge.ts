@@ -1,6 +1,6 @@
 import { sessionFromHeaders } from '../auth/capture-headers.js'
 import { CAPTURE_MESSAGE } from './protocol.js'
-import { storeSession } from './session-store.js'
+import { storeSession } from './session-write.js'
 
 // Runs in the extension's isolated world, where chrome.* is available.
 // Accepts only same-window messages carrying our own message type.

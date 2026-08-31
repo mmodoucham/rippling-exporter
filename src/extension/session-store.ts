@@ -12,14 +12,9 @@ declare const chrome: {
   storage: {
     session: {
       get(keys: string): Promise<Record<string, unknown>>
-      set(items: Record<string, unknown>): Promise<void>
       remove(key: string): Promise<void>
     }
   }
-}
-
-export async function storeSession(session: RipplingSession): Promise<void> {
-  await chrome.storage.session.set({ [SESSION_KEY]: session })
 }
 
 export async function readSession(): Promise<RipplingSession | null> {

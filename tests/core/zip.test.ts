@@ -20,6 +20,16 @@ describe('buildZip', () => {
     expect(new TextDecoder().decode(unpacked['invoices/a.pdf'])).toBe('%PDF-hello')
   })
 
+  it('round-trips binary content with all byte values', () => {
+    const binaryData = new Uint8Array(256)
+    for (let i = 0; i < 256; i++) {
+      binaryData[i] = i
+    }
+    const archive = buildZip([{ path: 'binary.bin', bytes: binaryData }])
+    const unpacked = unzipSync(archive)
+    expect(unpacked['binary.bin']).toEqual(binaryData)
+  })
+
   it('preserves nested directory paths', () => {
     const archive = buildZip([
       { path: 'invoices/attachments/x.pdf', bytes: bytes('%PDF-x') },

@@ -1,59 +1,63 @@
 # rippling-exporter
 
-Downloads contractor invoices, their attachments, and pay stubs from a personal
-Rippling account as PDFs.
+A Chrome extension that downloads your Rippling contractor invoices, invoice
+attachments and pay stubs as a single ZIP.
 
 ## Install
 
 ```bash
 npm install
-npx playwright install chromium
 npm run build
 ```
+
+Then in Chrome: open `chrome://extensions`, turn on Developer mode, choose
+"Load unpacked", and select the `extension/` directory.
 
 ## Use
 
-```bash
-node dist/cli.js --from 2026-01-01 --to 2026-08-31 --out ./exports
-```
+1. Open and log in to `app.rippling.com` in a tab. The extension reads the
+   session from the app's own requests, so this tab must exist.
+2. Click the Rippling Exporter toolbar button. It opens an export page.
+3. Pick a start and end date, choose which document types you want, and press
+   Export.
+4. The archive is saved to your Downloads folder as
+   `rippling-export-<from>-to-<to>.zip`, laid out as `invoices/`,
+   `invoices/attachments/` and `paystubs/`.
 
-The first run opens a browser window. Sign in yourself, including any MFA step.
-The session is saved to `~/.rippling-exporter/profile`, so later runs need no
-interaction. The tool never asks for, stores, or types your password.
+Each run downloads its whole date range — there is no resume state, because a
+run produces one complete archive. A run with failures still saves a ZIP of
+everything that succeeded and lists what failed.
 
-Reruns are safe and resumable: the manifest is written to disk after each
-batch of downloads (not just at the end), so if a run is interrupted the next
-run picks up where it left off. Documents already recorded in `manifest.json`
-with a matching hash are skipped, so at most one in-flight batch of documents
-is re-fetched on the next run.
+## Privacy
 
-Options:
+Your Rippling bearer token is held in `chrome.storage.session`, which is
+memory-only and cleared when Chrome closes. It is never written to disk and
+never logged. The extension requests access to exactly three hosts:
+`app.rippling.com` and the two CDN hosts that serve the PDFs.
 
-| Flag | Default | Meaning |
-|---|---|---|
-| `--from`, `--to` | required | Inclusive ISO date range |
-| `--types` | `invoices,paystubs` | Which document types to pull |
-| `--out` | `./exports` | Output directory |
-| `--no-attachments` | off | Skip invoice attachments |
-| `--concurrency` | `4` | Parallel downloads, 1-16 |
-
-Exit code is 1 if any document failed.
+The extension never asks for, stores, or types your password — you log in to
+Rippling yourself, as normal.
 
 ## Tax documents
 
-Not supported. The account has no completed tax year and Rippling's Taxes tab
-exposes no documents. See `docs/recon-notes.md`.
+Not supported. Rippling's Taxes tab exposes no documents for this account type;
+see `docs/recon-notes.md`.
+
+## Development
+
+```bash
+npm test        # unit tests, no network, no browser
+npm run test:cov
+npm run typecheck
+```
+
+`src/extension/` is excluded from coverage: it is DOM and Chrome-API wiring,
+verified by the manual check below rather than by unit tests.
 
 ## Manual smoke test
 
-Automated tests never touch the network. To verify against the live account:
-
-```bash
-npm run build
-node dist/cli.js --from 2026-01-01 --to 2026-12-31 --out /tmp/rex-smoke
-ls -R /tmp/rex-smoke
-```
-
-Expect invoice PDFs, an `invoices/attachments/` directory, pay stub PDFs, and a
-`manifest.json` with no failures. Run it a second time and confirm every
-document reports as skipped.
+With a logged-in Rippling tab open, run an export over a range you know has
+documents. Confirm the ZIP contains one PDF per invoice, the attachments
+subfolder is populated, pay stubs are present, and the failure list is empty.
+Then run it again with no Rippling tab open and confirm the page says the
+session is missing rather than failing silently.

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Rippling Exporter",
+  "version": "1.0.0",
+  "description": "Download your Rippling invoices, attachments and pay stubs as a ZIP.",
+  "permissions": ["downloads", "storage"],
+  "host_permissions": [
+    "https://app.rippling.com/*",
+    "https://secured-assets.ripplingcdn.com/*",
+    "https://prod-images.rippling.com/*"
+  ],
+  "background": { "service_worker": "dist/background.js", "type": "module" },
+  "action": { "default_title": "Export Rippling documents" },
+  "content_scripts": [
+    {
+      "matches": ["https://app.rippling.com/*"],
+      "js": ["dist/capture-main.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://app.rippling.com/*"],
+      "js": ["dist/capture-bridge.js"],
+      "world": "ISOLATED",
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": []
+}

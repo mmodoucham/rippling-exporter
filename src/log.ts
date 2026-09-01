@@ -25,9 +25,28 @@ export function safeMessage(error: unknown, url: string): string {
   return msg
 }
 
-function emit(level: 'info' | 'warn' | 'error', msg: string, fields?: Fields): void {
-  const line = JSON.stringify({ level, msg, ...(fields ?? {}) })
-  process.stderr.write(`${line}\n`)
+export interface LogLine {
+  readonly level: 'info' | 'warn' | 'error'
+  readonly msg: string
+  readonly fields: Fields
+}
+
+export type LogSink = (line: LogLine) => void
+
+const noopSink: LogSink = () => {}
+
+let sink: LogSink = noopSink
+
+export function setLogSink(next: LogSink): void {
+  sink = next
+}
+
+function emit(level: LogLine['level'], msg: string, fields?: Fields): void {
+  try {
+    sink({ level, msg, fields: fields ?? {} })
+  } catch {
+    // A logging sink must never be able to break a run.
+  }
 }
 
 export const logger = {

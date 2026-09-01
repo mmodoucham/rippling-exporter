@@ -6,3 +6,4 @@ exports/
 *.log
 .rippling-exporter/
 extension/dist/
+dist-release/

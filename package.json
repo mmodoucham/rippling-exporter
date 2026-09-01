@@ -1,12 +1,13 @@
 {
   "name": "rippling-exporter",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "package": "npm run build && node package.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -21,5 +22,11 @@
     "esbuild": "^0.24.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.2"
+  },
+  "description": "Chrome extension that downloads your Rippling contractor invoices, attachments and pay stubs as a ZIP",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmodoucham/rippling-exporter.git"
   }
 }

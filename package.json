@@ -18,10 +18,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
-    "@vitest/coverage-v8": "^2.1.2",
+    "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.24.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.2"
+    "vitest": "^4.1.11"
   },
   "description": "Chrome extension that downloads your Rippling contractor invoices, attachments and pay stubs as a ZIP",
   "license": "MIT",
